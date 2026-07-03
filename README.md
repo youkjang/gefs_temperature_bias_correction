@@ -7,5 +7,6 @@ This project is currently under active development; the single-notebook workflow
 *Banner image generated with AI and edited for project illustration.*
 
 
+
 # Note on AI-Assisted Work
 AI tools were used to support code drafting, debugging, code understanding, and discussion of scientific methods. I reviewed, modified, and tested the code myself.
