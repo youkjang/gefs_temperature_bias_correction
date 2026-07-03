@@ -5,3 +5,7 @@
 
 This project is currently under active development; the single-notebook workflow is being tested and expanded before future methods such as quantile mapping, machine-learning bias correction, and modular source files are added.
 *Banner image generated with AI and edited for project illustration.*
+
+
+# Note on AI-Assisted Work
+AI tools were used to support code drafting, debugging, code understanding, and discussion of scientific methods. I reviewed, modified, and tested the code myself.
