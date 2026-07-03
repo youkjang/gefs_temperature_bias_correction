@@ -9,4 +9,4 @@ This project is currently under active development; the single-notebook workflow
 
 
 # Note on AI-Assisted Work
-AI tools were used to support code drafting, debugging, code understanding, and discussion of scientific methods. I reviewed, modified, and tested the code myself.
+AI tools were used to support code drafting, debugging, code understanding, and discussion of scientific methods. I reviewed, modified, and tested the code myself. I also evaluated the results, interpreted the figures and verification metrics, and made the final scientific decisions about how to present the findings.
