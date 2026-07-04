@@ -27,7 +27,7 @@ setup(
         "s3fs>=2024.1.0",
         "fsspec>=2024.1.0",
         "scikit-learn>=1.3",
-        "netCDF>=1.6"
+        "netCDF>=1.6",
     ],
     extras_require={
         "plots": ["cartopy>=0.23"],
