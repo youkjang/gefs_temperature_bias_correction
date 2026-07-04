@@ -1,68 +1,69 @@
+"""Small synthetic dataset for testing the ML notebook without downloading GEFS data."""
+
+from __future__ import annotations
+
 import numpy as np
 import pandas as pd
 import xarray as xr
 
-from .config import ProjectConfig
 
+def make_synthetic_matched_dataset(
+    start_date: str = "2023-06-01",
+    end_date: str = "2023-08-31",
+    forecast_hours: list[int] | None = None,
+    n_lat: int = 20,
+    n_lon: int = 30,
+    seed: int = 42,
+) -> xr.Dataset:
+    """Create a synthetic GEFS/GFS matched dataset with realistic-looking T2M structure."""
+    if forecast_hours is None:
+        forecast_hours = [24, 48, 72, 96, 120]
 
-def make_synthetic_t2m_dataset(config: ProjectConfig, seed: int = 7) -> xr.Dataset:
-    """Create a synthetic matched forecast-analysis dataset for debugging."""
     rng = np.random.default_rng(seed)
+    init_dates = pd.date_range(start_date, end_date, freq="D")
+    lat = np.linspace(25.0, 42.0, n_lat)
+    lon = np.linspace(-107.0, -90.0, n_lon)
 
-    lats = np.arange(config.region.south, config.region.north + 0.1, 2.5)
-    lons = np.arange(config.region.west, config.region.east + 0.1, 2.5)
-    lon2d, lat2d = np.meshgrid(lons, lats)
+    cases = []
+    fhrs = []
+    dates = []
+    for d in init_dates:
+        for fhr in forecast_hours:
+            cases.append(f"{d.strftime('%Y%m%d')}_f{fhr:03d}")
+            fhrs.append(fhr)
+            dates.append(d)
 
-    forecast_cases = []
-    analysis_cases = []
-    init_values = []
-    fhr_values = []
-    valid_values = []
+    n_case = len(cases)
+    lon2d, lat2d = np.meshgrid(lon, lat)
 
-    for init_date in config.init_dates:
-        init_dt = pd.to_datetime(f"{init_date} {config.init_hour}:00")
-        for fhr in config.forecast_hours:
-            valid_dt = init_dt + pd.Timedelta(hours=int(fhr))
+    forecast = np.empty((n_case, n_lat, n_lon), dtype=float)
+    analysis = np.empty_like(forecast)
 
-            seasonal = 8.0 + 12.0 * np.cos(np.deg2rad(lat2d - 30.0))
-            wave = 2.0 * np.sin(np.deg2rad(lon2d + 100.0))
-            lead_bias = 0.2 + 0.015 * int(fhr)
-            spatial_bias = 0.8 * np.sin(np.deg2rad(lat2d * 2.0))
-            noise_analysis = rng.normal(0.0, 0.8, size=lat2d.shape)
-            noise_forecast = rng.normal(0.0, 1.0, size=lat2d.shape)
+    for i, (date, fhr) in enumerate(zip(dates, fhrs)):
+        doy = date.dayofyear
+        seasonal = 30 + 3.0 * np.sin((doy - 172) / 365 * 2 * np.pi)
+        spatial = -0.18 * (lat2d - 33) + 0.04 * (lon2d + 100)
+        synoptic = rng.normal(0, 1.0)
+        true_field = seasonal + spatial + synoptic + rng.normal(0, 0.7, size=(n_lat, n_lon))
 
-            analysis = seasonal + wave + noise_analysis
-            forecast = analysis + lead_bias + spatial_bias + noise_forecast
+        # Forecast bias depends on lead time and location.
+        warm_bias = 0.3 + 0.002 * fhr + 0.08 * (lat2d - lat2d.mean())
+        error_noise = rng.normal(0, 0.6 + 0.003 * fhr, size=(n_lat, n_lon))
+        analysis[i] = true_field
+        forecast[i] = true_field + warm_bias + error_noise
 
-            forecast_da = xr.DataArray(
-                forecast,
-                dims=("latitude", "longitude"),
-                coords={"latitude": lats, "longitude": lons},
-                name="forecast_t2m_c",
-                attrs={"units": "degC"},
-            )
-            analysis_da = xr.DataArray(
-                analysis,
-                dims=("latitude", "longitude"),
-                coords={"latitude": lats, "longitude": lons},
-                name="analysis_t2m_c",
-                attrs={"units": "degC"},
-            )
-
-            case_id = len(forecast_cases)
-            forecast_cases.append(forecast_da.expand_dims(case=[case_id]))
-            analysis_cases.append(analysis_da.expand_dims(case=[case_id]))
-            init_values.append(init_dt.normalize())
-            fhr_values.append(int(fhr))
-            valid_values.append(valid_dt)
-
-    forecast_all = xr.concat(forecast_cases, dim="case", compat="override", coords="minimal", combine_attrs="override")
-    analysis_all = xr.concat(analysis_cases, dim="case", compat="override", coords="minimal", combine_attrs="override")
-
-    ds = xr.Dataset({"forecast_t2m_c": forecast_all, "analysis_t2m_c": analysis_all})
-    ds = ds.assign_coords(
-        init_date=("case", pd.to_datetime(init_values)),
-        fhr=("case", np.asarray(fhr_values, dtype=int)),
-        valid_time=("case", pd.to_datetime(valid_values)),
+    ds = xr.Dataset(
+        {
+            "forecast_t2m_c": (("case", "latitude", "longitude"), forecast),
+            "analysis_t2m_c": (("case", "latitude", "longitude"), analysis),
+        },
+        coords={
+            "case": cases,
+            "latitude": lat,
+            "longitude": lon,
+            "fhr": ("case", np.asarray(fhrs, dtype=int)),
+            "init_date": ("case", np.asarray(dates, dtype="datetime64[ns]")),
+        },
+        attrs={"description": "Synthetic matched GEFS forecast and GFS analysis T2M dataset"},
     )
     return ds
