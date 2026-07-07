@@ -56,3 +56,19 @@ def print_dataset_summary(ds: xr.Dataset) -> None:
         f"{float(ds['analysis_t2m_c'].min()):.2f}, "
         f"{float(ds['analysis_t2m_c'].max()):.2f} °C"
     )
+
+def resolve_dataset_path(main_path: str | Path, fallback_paths: list[str | Path] | None = None) -> Path:
+    """Return the first existing matched NetCDF dataset path."""
+    main_path = Path(main_path)
+    if main_path.exists():
+        return main_path
+
+    for path in fallback_paths or []:
+        path = Path(path)
+        if path.exists():
+            return path
+
+    candidates = [str(main_path)] + [str(p) for p in (fallback_paths or [])]
+    raise FileNotFoundError(
+        "Could not find matched NetCDF dataset. Checked:\n" + "\n".join(candidates)
+    )
