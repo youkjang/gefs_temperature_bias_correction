@@ -52,3 +52,84 @@ def plot_spatial_map(da: xr.DataArray, title: str, save_path: str | Path | None 
         save_path.parent.mkdir(parents=True, exist_ok=True)
         fig.savefig(save_path, dpi=150, bbox_inches="tight")
     return fig, ax
+
+
+def plot_rmse_by_fhr(results: pd.DataFrame) -> None:
+    """Plot RMSE by forecast hour for all methods."""
+    plt.figure(figsize=(9, 5))
+    for method, group in results.groupby("method"):
+        group = group.sort_values("fhr")
+        plt.plot(group["fhr"], group["rmse_c"], marker="o", label=method)
+
+    plt.xlabel("Forecast hour")
+    plt.ylabel("Area-weighted RMSE (°C)")
+    plt.title("GEFS T2M RMSE: raw vs bias-correction methods")
+    plt.grid(True, alpha=0.3)
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_rmse_improvement(results_with_improvement: pd.DataFrame) -> None:
+    """Plot RMSE improvement relative to raw GEFS."""
+    df = results_with_improvement[results_with_improvement["method"] != "raw_gefs"].copy()
+
+    plt.figure(figsize=(9, 5))
+    for method, group in df.groupby("method"):
+        group = group.sort_values("fhr")
+        plt.plot(group["fhr"], group["rmse_improvement_c"], marker="o", label=method)
+
+    plt.axhline(0, color="black", linewidth=1)
+    plt.xlabel("Forecast hour")
+    plt.ylabel("RMSE improvement relative to raw GEFS (°C)")
+    plt.title("Positive values mean lower RMSE than raw GEFS")
+    plt.grid(True, alpha=0.3)
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_spatial_error_example(
+    ds: xr.Dataset,
+    corrected_dict: dict[str, xr.DataArray],
+    case_index: int = 0,
+    vmin: float = -5,
+    vmax: float = 5,
+) -> None:
+    """Plot spatial error maps for raw and selected correction methods for one test case."""
+    methods = {"raw_gefs": ds["forecast_t2m_c"]}
+    methods.update(corrected_dict)
+
+    n_methods = len(methods)
+    fig, axes = plt.subplots(
+        1,
+        n_methods,
+        figsize=(5 * n_methods, 4),
+        constrained_layout=True,
+    )
+    if n_methods == 1:
+        axes = [axes]
+
+    fhr = int(ds["fhr"].isel(case=case_index).item())
+    valid_time = pd.to_datetime(ds["valid_time"].isel(case=case_index).values).strftime(
+        "%Y-%m-%d"
+    )
+
+    for ax, (name, da) in zip(axes, methods.items()):
+        error = da.isel(case=case_index) - ds["analysis_t2m_c"].isel(case=case_index)
+        im = ax.pcolormesh(
+            ds["longitude"],
+            ds["latitude"],
+            error,
+            shading="auto",
+            cmap="coolwarm",
+            vmin=vmin,
+            vmax=vmax,
+        )
+        ax.set_title(f"{name}\nf{fhr:03d}, valid {valid_time}")
+        ax.set_xlabel("Longitude")
+        ax.set_ylabel("Latitude")
+        plt.colorbar(im, ax=ax, label="Error (°C)")
+
+    plt.show()
+
