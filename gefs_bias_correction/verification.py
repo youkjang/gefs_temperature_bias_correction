@@ -8,6 +8,10 @@ def area_weights(da: xr.DataArray, lat_name: str = "latitude") -> xr.DataArray:
     weights = np.cos(np.deg2rad(da[lat_name]))
     return weights / weights.mean()
 
+def weighted_mean_2d(da: xr.DataArray) -> xr.DataArray:
+    """Compute an area-weighted spatial mean over latitude and longitude."""
+    weights = area_weights(da["latitude"])
+    return da.weighted(weights).mean(dim=("latitude", "longitude"))
 
 def area_weighted_mean(da: xr.DataArray) -> xr.DataArray:
     """Area-weighted mean over latitude and longitude."""
