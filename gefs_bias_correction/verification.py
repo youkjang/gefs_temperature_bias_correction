@@ -52,3 +52,53 @@ def make_summary_table(test_ds: xr.Dataset, corrected: xr.DataArray) -> pd.DataF
         "mae_c_raw", "mae_c_corrected", "mae_improvement_c",
     ]
     return wide[columns].sort_values("fhr").reset_index(drop=True)
+
+def compute_metrics_by_fhr(
+    ds: xr.Dataset,
+    forecast_da: xr.DataArray,
+    method_name: str,
+) -> pd.DataFrame:
+    """Compute area-weighted bias, RMSE, and MAE by forecast hour."""
+    rows: list[dict[str, float | int | str]] = []
+    analysis = ds["analysis_t2m_c"]
+
+    for fhr in sorted(np.unique(ds["fhr"].values)):
+        mask = ds["fhr"] == fhr
+        forecast = forecast_da.where(mask, drop=True)
+        observed = analysis.where(mask, drop=True)
+        error = forecast - observed
+
+        bias_cases = weighted_mean_2d(error)
+        rmse_cases = np.sqrt(weighted_mean_2d(error**2))
+        mae_cases = weighted_mean_2d(np.abs(error))
+
+        rows.append(
+            {
+                "method": method_name,
+                "fhr": int(fhr),
+                "bias_c": float(bias_cases.mean()),
+                "rmse_c": float(rmse_cases.mean()),
+                "mae_c": float(mae_cases.mean()),
+                "n_cases": int(mask.sum()),
+            }
+        )
+
+    return pd.DataFrame(rows)
+
+def combine_results_with_improvement(results: pd.DataFrame) -> pd.DataFrame:
+    """Add RMSE, MAE, and absolute-bias improvement relative to raw GEFS."""
+    raw = results[results["method"] == "raw_gefs"][["fhr", "rmse_c", "mae_c", "bias_c"]]
+    raw = raw.rename(
+        columns={
+            "rmse_c": "raw_rmse_c",
+            "mae_c": "raw_mae_c",
+            "bias_c": "raw_bias_c",
+        }
+    )
+
+    out = results.merge(raw, on="fhr", how="left")
+    out["rmse_improvement_c"] = out["raw_rmse_c"] - out["rmse_c"]
+    out["mae_improvement_c"] = out["raw_mae_c"] - out["mae_c"]
+    out["abs_bias_improvement_c"] = np.abs(out["raw_bias_c"]) - np.abs(out["bias_c"])
+    return out.sort_values(["fhr", "method"]).reset_index(drop=True)
+
