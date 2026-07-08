@@ -161,3 +161,36 @@ def plot_rmse_and_improvement(results_df):
     axes[1].legend()
     plt.tight_layout()
     plt.show()
+
+def plot_spatial_error_maps(test_ds, forecast_dict, fhr=24, case_index_for_fhr=0, vmin=-5, vmax=5):
+    """Plot spatial error maps for selected methods at one forecast hour."""
+    subset = test_ds.where(test_ds["fhr"] == fhr, drop=True)
+    if subset.sizes["case"] == 0:
+        raise ValueError(f"No cases found for fhr={fhr}")
+
+    idx = min(case_index_for_fhr, subset.sizes["case"] - 1)
+    valid_time = pd.to_datetime(subset["valid_time"].isel(case=idx).values).strftime("%Y-%m-%d")
+    obs = subset["analysis_t2m_c"].isel(case=idx)
+
+    n_methods = len(forecast_dict)
+    fig, axes = plt.subplots(1, n_methods, figsize=(5 * n_methods, 4), constrained_layout=True)
+    if n_methods == 1:
+        axes = [axes]
+
+    for ax, (name, da) in zip(axes, forecast_dict.items()):
+        da_subset = da.where(da["fhr"] == fhr, drop=True)
+        error = da_subset.isel(case=idx) - obs
+        im = ax.pcolormesh(
+            error["longitude"],
+            error["latitude"],
+            error,
+            shading="auto",
+            cmap="coolwarm",
+            vmin=vmin,
+            vmax=vmax,
+        )
+        ax.set_title(f"{name}\nf{fhr:03d}, valid {valid_time}")
+        ax.set_xlabel("Longitude")
+        ax.set_ylabel("Latitude")
+        plt.colorbar(im, ax=ax, label="Error (°C)")
+    plt.show()
