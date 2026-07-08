@@ -133,3 +133,31 @@ def plot_spatial_error_example(
 
     plt.show()
 
+def plot_rmse_and_improvement(results_df):
+    """Plot RMSE and RMSE improvement by forecast lead time."""
+    methods = list(results_df["method"].unique())
+    fig, axes = plt.subplots(2, 1, figsize=(10, 9), sharex=True)
+
+    for method in methods:
+        sub = results_df[results_df["method"] == method].sort_values("fhr")
+        axes[0].plot(sub["fhr"], sub["rmse_c"], marker="o", label=method)
+
+    axes[0].set_title("GEFS T2M RMSE: raw vs spatial-feature bias-correction methods")
+    axes[0].set_ylabel("Area-weighted RMSE (°C)")
+    axes[0].grid(True, alpha=0.3)
+    axes[0].legend()
+
+    for method in methods:
+        if method == "raw_gefs":
+            continue
+        sub = results_df[results_df["method"] == method].sort_values("fhr")
+        axes[1].plot(sub["fhr"], sub["rmse_improvement_c"], marker="o", label=method)
+
+    axes[1].axhline(0, linewidth=1)
+    axes[1].set_title("Positive values mean lower RMSE than raw GEFS")
+    axes[1].set_xlabel("Forecast hour")
+    axes[1].set_ylabel("RMSE improvement relative to raw GEFS (°C)")
+    axes[1].grid(True, alpha=0.3)
+    axes[1].legend()
+    plt.tight_layout()
+    plt.show()
