@@ -106,6 +106,33 @@ def combine_results_with_improvement(results: pd.DataFrame) -> pd.DataFrame:
     out["abs_bias_improvement_c"] = np.abs(out["raw_bias_c"]) - np.abs(out["bias_c"])
     return out.sort_values(["fhr", "method"]).reset_index(drop=True)
 
+def verify_forecast_by_lead(ds_input, forecast_da, method_name: str) -> pd.DataFrame:
+    """Compute area-weighted bias, RMSE, and MAE by forecast lead time."""
+    rows = []
+    fhrs = sorted(np.unique(ds_input["fhr"].values))
+
+    for fhr in fhrs:
+        mask = ds_input["fhr"] == fhr
+        obs = ds_input["analysis_t2m_c"].where(mask, drop=True)
+        fcst = forecast_da.where(mask, drop=True)
+        error = fcst - obs
+
+        bias = float(area_weighted_mean(error).values)
+        rmse = float(np.sqrt(area_weighted_mean(error**2)).values)
+        mae = float(area_weighted_mean(abs(error)).values)
+        n_cases = int(obs.sizes["case"])
+        rows.append(
+            {
+                "method": method_name,
+                "fhr": int(fhr),
+                "bias_c": bias,
+                "rmse_c": rmse,
+                "mae_c": mae,
+                "n_cases": n_cases,
+            }
+        )
+    return pd.DataFrame(rows)
+
 def build_verification_table(test_ds, mean_bias_corrected, ml_corrected_dict: dict) -> pd.DataFrame:
     """Build comparison table for raw GEFS, mean-bias correction, and ML methods."""
     raw_da = test_ds["forecast_t2m_c"]
