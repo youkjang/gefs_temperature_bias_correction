@@ -106,3 +106,24 @@ def combine_results_with_improvement(results: pd.DataFrame) -> pd.DataFrame:
     out["abs_bias_improvement_c"] = np.abs(out["raw_bias_c"]) - np.abs(out["bias_c"])
     return out.sort_values(["fhr", "method"]).reset_index(drop=True)
 
+def build_verification_table(test_ds, mean_bias_corrected, ml_corrected_dict: dict) -> pd.DataFrame:
+    """Build comparison table for raw GEFS, mean-bias correction, and ML methods."""
+    raw_da = test_ds["forecast_t2m_c"]
+    tables = [
+        verify_forecast_by_lead(test_ds, raw_da, "raw_gefs"),
+        verify_forecast_by_lead(test_ds, mean_bias_corrected, "mean_bias"),
+    ]
+    for name, da in ml_corrected_dict.items():
+        tables.append(verify_forecast_by_lead(test_ds, da, name))
+
+    results = pd.concat(tables, ignore_index=True)
+    raw_ref = (
+        results[results["method"] == "raw_gefs"][["fhr", "rmse_c", "mae_c", "bias_c"]]
+        .rename(columns={"rmse_c": "raw_rmse_c", "mae_c": "raw_mae_c", "bias_c": "raw_bias_c"})
+    )
+    results = results.merge(raw_ref, on="fhr", how="left")
+    results["rmse_improvement_c"] = results["raw_rmse_c"] - results["rmse_c"]
+    results["mae_improvement_c"] = results["raw_mae_c"] - results["mae_c"]
+    results["abs_bias_improvement_c"] = abs(results["raw_bias_c"]) - abs(results["bias_c"])
+    return results.sort_values(["fhr", "method"]).reset_index(drop=True)
+
