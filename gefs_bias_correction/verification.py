@@ -106,6 +106,13 @@ def combine_results_with_improvement(results: pd.DataFrame) -> pd.DataFrame:
     out["abs_bias_improvement_c"] = np.abs(out["raw_bias_c"]) - np.abs(out["bias_c"])
     return out.sort_values(["fhr", "method"]).reset_index(drop=True)
 
+#for spatial feature ML bias correction
+def _area_weighted_mean(da):
+    """Area-weighted mean over case, latitude, and longitude."""
+    weights = np.cos(np.deg2rad(da["latitude"]))
+    return da.weighted(weights).mean(dim=("case", "latitude", "longitude"), skipna=True)
+
+
 def verify_forecast_by_lead(ds_input, forecast_da, method_name: str) -> pd.DataFrame:
     """Compute area-weighted bias, RMSE, and MAE by forecast lead time."""
     rows = []
@@ -117,9 +124,9 @@ def verify_forecast_by_lead(ds_input, forecast_da, method_name: str) -> pd.DataF
         fcst = forecast_da.where(mask, drop=True)
         error = fcst - obs
 
-        bias = float(area_weighted_mean(error).values)
+        bias = float(_area_weighted_mean(error).values)
         rmse = float(np.sqrt(area_weighted_mean(error**2)).values)
-        mae = float(area_weighted_mean(abs(error)).values)
+        mae = float(_area_weighted_mean(abs(error)).values)
         n_cases = int(obs.sizes["case"])
         rows.append(
             {
