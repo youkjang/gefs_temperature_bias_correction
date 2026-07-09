@@ -125,7 +125,7 @@ def verify_forecast_by_lead(ds_input, forecast_da, method_name: str) -> pd.DataF
         error = fcst - obs
 
         bias = float(_area_weighted_mean(error).values)
-        rmse = float(np.sqrt(area_weighted_mean(error**2)).values)
+        rmse = float(np.sqrt(_area_weighted_mean(error**2)).values)
         mae = float(_area_weighted_mean(abs(error)).values)
         n_cases = int(obs.sizes["case"])
         rows.append(
